@@ -160,3 +160,162 @@ This node is critical.
 #### What it does
 - Reads the AI’s raw output
 - Detects if the AI output is exactly:
+- - Assigns a confidence score
+- Cleans responses so `ESCALATE` never reaches the user
+- Outputs routing flags
+
+#### Escalation Conditions
+- AI explicitly outputs `ESCALATE`
+- Confidence score drops below threshold
+- User asks for:
+- Human agent
+- Customer support
+- Manager
+- Representative
+
+---
+
+### 8. Escalation Decision
+
+**Node:** `Should Escalate?`
+
+- Simple IF node
+- Checks `shouldEscalate = true`
+
+#### TRUE path
+1. Notify customer they’re being transferred
+2. Alert human agent via WhatsApp with:
+ - Customer number
+ - Original message
+
+#### FALSE path
+- Send AI response directly to the customer
+
+---
+
+### 9. WhatsApp Messaging
+
+**Nodes:**
+- `Send AI Response`
+- `Send Escalation Message`
+- `Notify Human Agent`
+
+These nodes handle all outbound WhatsApp communication.
+
+---
+
+## How to Use This Workflow
+
+### 1. Import the Workflow
+
+1. Open n8n
+2. Click **Import from File**
+3. Select `workflow.json`
+4. Save
+
+---
+
+### 2. Configure Credentials
+
+You must configure the following credentials:
+
+- WhatsApp Cloud API (Trigger + Send)
+- OpenAI API
+- Google Sheets OAuth
+- PostgreSQL
+- Supabase
+
+Ensure all credential names match the workflow nodes or update them accordingly.
+
+---
+
+### 3. Prepare Google Sheets
+
+Ensure your spreadsheet has:
+
+- A **Products** sheet with correct columns
+- An **Orders** sheet for order storage
+
+Only products with `in_stock = YES` will be shown.
+
+---
+
+### 4. Populate the RAG Knowledge Base
+
+- Insert business documents into the Supabase `documents` table
+- Generate embeddings using the provided embeddings node
+- Store:
+- Policies
+- FAQs
+- Support information
+
+---
+
+### 5. Test the Flow
+
+Recommended test messages:
+
+- “Hi”
+- “What do you sell?”
+- “How much is item X?”
+- “I want to order 2 of item Y”
+- “Yes” (to confirm order)
+- “Cancel my order”
+- “I want to talk to customer support”
+
+---
+
+### 6. Activate the Workflow
+
+Once verified:
+- Remove pinned trigger data
+- Activate the workflow
+- Connect your WhatsApp number
+
+---
+
+## Design Principles
+
+- Deterministic over creative
+- Tools over hallucination
+- Escalate early rather than guess
+- One order at a time
+- No silent failures
+
+---
+
+## What This Workflow Is Good For
+
+- WhatsApp commerce
+- Small business sales bots
+- MVPs for customer support automation
+- AI-assisted order processing
+- Human-in-the-loop AI systems
+
+---
+
+## What It Intentionally Does NOT Do
+
+- No fake products
+- No guessed prices
+- No auto-orders without confirmation
+- No pretending to be human
+- No uncontrolled LLM replies
+
+---
+
+## Files Included
+
+- `workflow.json` – n8n workflow export
+- `n8n.png` – Visual overview of the workflow canvas
+- `README.md` – This document
+
+---
+
+## Final Note
+
+This workflow is built to be **auditable, extensible, and safe**.
+You can plug in different models, replace Sheets with a database, or extend the escalation logic — without breaking the core guarantees.
+
+If you’re building serious WhatsApp automation, this is a solid foundation.
+
