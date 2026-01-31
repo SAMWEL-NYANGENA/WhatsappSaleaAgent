@@ -1,3 +1,5 @@
+![Workflow Overview](n8n.png)
+
 # WhatsApp AI Sales & Order-Taking Workflow (n8n)
 
 ## Overview
