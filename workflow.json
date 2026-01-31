@@ -1,0 +1,954 @@
+{
+  "name": "Whatsapp Support Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "b724682c-3018-4bdc-bb61-af7c9399b3fc",
+              "leftValue": "={{ $json.shouldEscalate }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "75a144be-4785-4fdb-a1f5-8029d9cbcdcd",
+      "name": "Should Escalate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $json.phoneNumberId }}",
+        "recipientPhoneNumber": "={{ $json.customerPhone }}",
+        "textBody": "={{ $json.aiResponse }}",
+        "additionalFields": {}
+      },
+      "id": "f22081ea-376c-47c2-bf74-5516753d09cf",
+      "name": "Send AI Response",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        1904
+      ],
+      "webhookId": "abbc7a38-5fcd-44c3-bc48-493af3356d6f",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "ZO5xFTIUPs33Mw8C",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "={{ $json.phoneNumberId }}",
+        "recipientPhoneNumber": "={{ $json.customerPhone }}",
+        "textBody": "I'm passing you over to a human specialist who can help you better. Please wait a moment.",
+        "additionalFields": {}
+      },
+      "id": "7b50bb45-3669-43da-8c14-17a996f41696",
+      "name": "Send Escalation Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -992,
+        1712
+      ],
+      "webhookId": "10475d54-ec8e-4a26-bed6-33519326e827",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "ZO5xFTIUPs33Mw8C",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2800,
+        1808
+      ],
+      "id": "1439d59e-0a27-4faf-ba4e-6f05bab68658",
+      "name": "WhatsApp Trigger1",
+      "webhookId": "91f4cfc1-c775-46dd-a311-ede29549c44d",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "TOxAx72yOBsXUDhO",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get data from preceding nodes\nconst agentOutput = $input.first().json;\n\n// Ensure this matches your actual WhatsApp Trigger node name\nconst triggerData = $(\"WhatsApp Trigger1\").first().json;\n\nconst responseText = agentOutput.output || agentOutput.text || '';\n\n// 1. ESCALATION LOGIC — single keyword only\nconst manualEscalate = responseText.trim().toUpperCase() === 'ESCALATE';\n\n// 2. Confidence Scoring\nlet confidence = 0.9; // Default: high confidence\n\nif (manualEscalate) {\n  confidence = 0.3;\n} else if (responseText.length < 5) {\n  confidence = 0.4;\n} else if (\n  responseText.toLowerCase().includes(\"don't know\") ||\n  responseText.toLowerCase().includes(\"not sure\")\n) {\n  confidence = 0.4;\n}\n\n// 3. Clean response (ESCALATE must NEVER reach user)\nlet cleanedResponse = manualEscalate ? '' : responseText.trim();\n\n// 4. Output for IF / Router node\nreturn [{\n  json: {\n    aiResponse: cleanedResponse,\n    confidence,\n    shouldEscalate: manualEscalate || confidence < 0.5,\n    escalationReason: manualEscalate\n      ? 'Explicit AI escalation'\n      : (confidence < 0.5 ? 'Low confidence' : 'None'),\n    customerPhone: triggerData.messages[0].from,\n    phoneNumberId: triggerData.metadata.phone_number_id,\n    customerName: triggerData.contacts[0]?.profile?.name || 'Customer',\n    originalMessage: triggerData.messages[0].text?.body || '[Non-text message]'\n  }\n}];\n"
+      },
+      "id": "89cfc3a7-f221-4b10-b551-6e8e0fa17d52",
+      "name": "Analyze Confidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1440,
+        1808
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "933698959834668",
+        "recipientPhoneNumber": "={{ $json.contacts[0].input }}",
+        "textBody": "= ESCALATION ALERT\n\nPlease respond to this client immediately.\n\n*CustomerNumber*: +{{ $json.contacts[0].input }}\n\n*Query*: {{ $('WhatsApp Trigger1').item.json.messages[0].text.body }}",
+        "additionalFields": {}
+      },
+      "id": "e2684d83-f8e3-400d-98a8-0aa2a97b14a5",
+      "name": "Notify Human Agent",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        1712
+      ],
+      "webhookId": "3b63f806-6fa3-4cad-a486-29e1b3fe6581",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "ZO5xFTIUPs33Mw8C",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messages[0].text.body }}",
+        "options": {
+          "systemMessage": "=You are a sales and order-taking assistant.\n\nYou operate ONLY using the tools provided to you.\nYou do NOT invent products, prices, customers, or orders.\nAccuracy is more important than sounding smart.\n\nAVAILABLE TOOLS (YOU MUST USE THESE)\n1) TOOL: search goods\n\nPurpose\nRead available products from Google Sheets\n\nUse this tool when\n\nUser asks what is available\n\nUser asks what you sell\n\nUser asks for menu\n\nUser asks price or availability of an item\n\nReturned data includes\n\nproduct_id\n\nproduct_name\n\ncategory\n\ndescription\n\nprice\n\ncurrency\n\nin_stock\n\nstock_qty\n\nunit\n\nRules\n\nOnly show items where in_stock = YES\n\nNever list out-of-stock items unless user explicitly asks\n\n2) TOOL: record order\n\nPurpose\nCreate a NEW order in the orders table\n\nRequired fields\n\norder_id (generate a unique value)\n\nemail\n\ncustomer_name\n\nproduct_id\n\nproduct_name\n\nqty\n\nprice\n\ntotal\n\nstatus (always set to pending)\n\nIMPORTANT\n\nUse this tool ONLY after the user explicitly confirms the order\n\nNever create an order without confirmation\n\n3) TOOL: update orders\n\nPurpose\nUpdate an EXISTING order (by order_id)\n\nUse when\n\nUser wants to change quantity\n\nUser wants to update email or name\n\nUser wants to change order status\n\nRules\n\nYou MUST know the order_id before updating\n\nIf order_id is missing, ask for it\n\nOnly update the fields requested\n\n4) TOOL: delete order\n\nPurpose\nDelete an existing order\n\nRules\n\nUser must explicitly request cancellation\n\nYou MUST confirm the order_id\n\nAsk for confirmation before deleting\n\n5) TOOL: RAG TOOL\n\nPurpose\nRetrieve business-related information such as:\n\nPolicies\n\nCustomer support\n\nBusiness details\n\nOperating hours\n\nDelivery or return rules\n\nRules\n\nUse ONLY for business information\n\nDo NOT use for products or orders\n\nESCALATION RULES (CRITICAL)\n\nYou MUST output exactly the word:\n\nESCALATE\n\n(with no extra text, punctuation, or explanation)\n\nONLY in these situations:\n\nThe RAG TOOL returns no information, empty data, or fails to answer a business-related question\n\nThe user explicitly requests to speak to a human agent, customer support, manager, or representative\n\nWhen outputting ESCALATE:\n\nDo NOT say anything else\n\nDo NOT explain\n\nDo NOT ask follow-up questions\n\nDo NOT use any tools\n\nCORE BEHAVIOR\n1) GREETING\n\nIf the user greets (hi, hello, hey, sasa):\nRespond politely and explain that you can:\n\nShow available products\n\nCheck prices\n\nPlace an order\n\nUpdate or cancel an order\n\n2) SHOW AVAILABLE PRODUCTS\n\nIf the user asks for products or a menu:\n\nUse search goods\n\nFilter where in_stock = YES\n\nSummarize by category\n\nShow product_name, price, currency, and unit\n\n3) PRICE / AVAILABILITY\n\nIf the user asks about a specific item:\n\nUse search goods\n\nMatch product_name\n\nOutcomes:\n\nIf in_stock = YES → show price, currency, unit\n\nIf in_stock = NO → say it is unavailable\n\nIf product is NOT FOUND → clearly say you do not sell it\n\nThis is NOT an escalation case.\n\n4) PLACING AN ORDER (INTENT-AWARE)\n\nBefore creating an order, you MUST collect all missing required information.\n\nRequired customer information\n\ncustomer_name\n\nemail\n\nRequired order information\n\nproduct (explicit or inferred)\n\nquantity\n\nPRODUCT RESOLUTION RULES\n\nIf the user mentions a product using a plural, category, or generic term (for example: “doughnuts”)\nAND there is exactly ONE in-stock product that clearly matches,\nTHEN automatically resolve to that product and DO NOT ask the user to repeat the product name.\n\nAsk the user to clarify the product ONLY if:\n\nMultiple in-stock products match the request, OR\n\nNo matching product is found.\n\nNever ask for the product name again if it has already been clearly identified or confidently inferred.\n\nORDER FLOW\n\nResolve and validate the product using search goods\n\nConfirm in_stock = YES\n\nConfirm or extract quantity\n\nIf product and quantity are known, DO NOT ask product questions again\n\nCollect any missing customer details (name, email)\n\nCalculate total = qty × price\n\nPresent a clear order summary\n\nAsk the user to confirm with YES or NO\n\nDo NOT create the order yet.\n\n5) CONFIRMATION\n\nIf the user replies YES:\n\nGenerate a unique order_id\n\nUse record order\n\nSet status = pending\n\nConfirm success\n\nIf the user replies NO:\n\nCancel politely\n\nDo not save anything\n\n6) UPDATING AN ORDER\n\nAsk for order_id if missing\n\nConfirm requested changes\n\nUse update orders\n\nConfirm update\n\n7) DELETING / CANCELLING AN ORDER\n\nAsk for order_id\n\nAsk for confirmation\n\nUse delete order\n\nConfirm deletion\n\nSTRICT RULES\n\nNever guess product names\n\nNever guess prices\n\nNever assume quantities\n\nNever ask the user to repeat information already confirmed or inferred\n\nNever create, update, or delete orders without explicit intent\n\nIf required information is missing, ask only for what is missing\n\nHandle one order at a time\n\nDo NOT use RAG tool for product or order data\n\nOnly output ESCALATE when escalation rules apply\n\nTONE\n\nClear\n\nProfessional\n\nConcise\n\nHelpful\n\nDeterministic"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2256,
+        1808
+      ],
+      "id": "23a9e493-034b-45c6-9b00-97dc36ad9ebf",
+      "name": "supabase bot1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -2576,
+        2032
+      ],
+      "id": "b44641b0-2e89-4e22-b754-2cd9d4025bbd",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "1J4HgDiwkzSlPJgz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1728,
+        2240
+      ],
+      "id": "02dc3d7b-934c-4808-a54f-b00cd854dc3c",
+      "name": "Embeddings OpenAI2",
+      "credentials": {
+        "openAiApi": {
+          "id": "1J4HgDiwkzSlPJgz",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.messages[0].from }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -2448,
+        2032
+      ],
+      "id": "c129fee7-e592-437f-84cc-59337dcc2c4a",
+      "name": "Postgres Chat Memory1",
+      "credentials": {
+        "postgres": {
+          "id": "CNh9398OAsj6ye7P",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok",
+          "mode": "list",
+          "cachedResultName": "vapi_agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 346462956,
+          "mode": "list",
+          "cachedResultName": "Sheet6",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit#gid=346462956"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -2320,
+        2032
+      ],
+      "id": "8103188c-1f8e-4bb7-9829-cc190e12917e",
+      "name": "search goods",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dLuk3qUW2bezrcWv",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok",
+          "mode": "list",
+          "cachedResultName": "vapi_agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1073283450,
+          "mode": "list",
+          "cachedResultName": "Sheet7",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit#gid=1073283450"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('order_id__using_to_match_', ``, 'string') }}",
+            "email": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('email', ``, 'string') }}",
+            "customer_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_name', ``, 'string') }}",
+            "product_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('product_id', ``, 'string') }}",
+            "product_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('product_name', ``, 'string') }}",
+            "qty": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('qty', ``, 'string') }}",
+            "price": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('price', ``, 'string') }}",
+            "total": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('total', ``, 'string') }}",
+            "status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('status', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_name",
+              "displayName": "product_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qty",
+              "displayName": "qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -2192,
+        2032
+      ],
+      "id": "0fa659b3-1a8c-4275-afc7-810a4d7c8995",
+      "name": "update orders",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dLuk3qUW2bezrcWv",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok",
+          "mode": "list",
+          "cachedResultName": "vapi_agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1073283450,
+          "mode": "list",
+          "cachedResultName": "Sheet7",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit#gid=1073283450"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "order_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('order_id', ``, 'string') }}",
+            "email": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('email', ``, 'string') }}",
+            "customer_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_name', ``, 'string') }}",
+            "product_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('product_id', ``, 'string') }}",
+            "product_name": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('product_name', ``, 'string') }}",
+            "qty": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('qty', ``, 'string') }}",
+            "price": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('price', ``, 'string') }}",
+            "total": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('total', ``, 'string') }}",
+            "status": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('status', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "order_id",
+              "displayName": "order_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_id",
+              "displayName": "product_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "product_name",
+              "displayName": "product_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qty",
+              "displayName": "qty",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "price",
+              "displayName": "price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "total",
+              "displayName": "total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -2064,
+        2032
+      ],
+      "id": "9ff3cd4a-61ef-4a83-8020-45d86b16de86",
+      "name": "record order",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dLuk3qUW2bezrcWv",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok",
+          "mode": "list",
+          "cachedResultName": "vapi_agent",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1073283450,
+          "mode": "list",
+          "cachedResultName": "Sheet7",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1cXTV3-hM1xX2zPZ_RBF21hJXdoXocd5Di_dKXFuUeok/edit#gid=1073283450"
+        },
+        "startIndex": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start_Row_Number', ``, 'number') }}",
+        "numberToDelete": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Number_of_Rows_to_Delete', ``, 'number') }}"
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        -1936,
+        2032
+      ],
+      "id": "e8e05014-593a-48db-87df-20254698f0a7",
+      "name": "delete order",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dLuk3qUW2bezrcWv",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "retrieve relevant chunks of data as per user query",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -1808,
+        2032
+      ],
+      "id": "2b60a0e0-56ee-4444-be20-b00f946383b5",
+      "name": "RAG tool",
+      "credentials": {
+        "supabaseApi": {
+          "id": "UmvFvJXmv1sMRVIg",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "WHATSAPP TRIGGER\n\nThis is the entry point of the workflow. It listens for incoming WhatsApp messages from customers and triggers the automation when a new message arrives.",
+        "width": 280
+      },
+      "id": "9d6cdb90-f6ab-4c85-af59-bca95bec1ee4",
+      "name": "Note: WhatsApp Trigger",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2896,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "content": "AI AGENT (Sales Bot)\n\nThe brain of the operation. This agent processes customer messages, uses available tools to search products, manage orders, and retrieve business info. It follows strict rules for order-taking and escalation.",
+        "height": 200,
+        "width": 300
+      },
+      "id": "4d1543ae-9297-4e35-afeb-3664130e66cc",
+      "name": "Note: AI Agent",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2288,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "content": "OPENAI MODEL\n\nProvides the GPT-4o-mini language model that powers the AI agent's understanding and response generation.",
+        "height": 172,
+        "width": 260
+      },
+      "id": "89952b29-0825-4f46-97d9-3fcc76f3dffb",
+      "name": "Note: OpenAI Model",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2752,
+        1984
+      ]
+    },
+    {
+      "parameters": {
+        "content": "CHAT MEMORY\n\nStores conversation history in PostgreSQL database. Remembers the last 10 messages per customer (identified by phone number) so the AI can maintain context across multiple messages.",
+        "height": 180,
+        "width": 280
+      },
+      "id": "f95c91fb-93ce-4b0e-8e7d-e250f4710b08",
+      "name": "Note: Chat Memory",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2640,
+        2080
+      ]
+    },
+    {
+      "parameters": {
+        "content": "GOOGLE SHEETS TOOLS\n\n• Search Goods: Reads product catalog\n• Record Order: Creates new orders\n• Update Orders: Modifies existing orders\n• Delete Order: Cancels orders\n\nThese tools let the AI interact with your inventory and order management spreadsheet.",
+        "height": 220,
+        "width": 320
+      },
+      "id": "27f0b142-4bcc-4ddd-a0f3-62e97e4a1df3",
+      "name": "Note: Tools",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -2288,
+        2032
+      ]
+    },
+    {
+      "parameters": {
+        "content": "CONFIDENCE ANALYSIS\n\nAnalyzes the AI's response to determine:\n• If AI explicitly said \"ESCALATE\"\n• Confidence score (based on response length/quality)\n• Whether to route to human or send AI response\n\nExtracts customer info and prepares data for routing.",
+        "height": 200,
+        "width": 300
+      },
+      "id": "77af4a70-b349-43b1-aac9-e4c792333d9a",
+      "name": "Note: Confidence Analysis",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1616,
+        1584
+      ]
+    },
+    {
+      "parameters": {
+        "content": "ESCALATION DECISION\n\nChecks if shouldEscalate = true\n\n✓ TRUE → Route to human agent path\n✗ FALSE → Send AI response to customer",
+        "width": 280
+      },
+      "id": "f5b196d0-abf0-4971-a3e5-b12788ad5b60",
+      "name": "Note: Escalation Check",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1296,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "content": "AI RESPONSE PATH\n\nSends the AI-generated response back to the customer via WhatsApp. Only executes when confidence is high and no escalation is needed.",
+        "width": 280
+      },
+      "id": "36b3b320-494b-4f53-8851-d1ac0ddb281d",
+      "name": "Note: Response Path",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1040,
+        1920
+      ]
+    },
+    {
+      "parameters": {
+        "content": "ESCALATION PATH\n\n1. Send Escalation Message: Tells customer they're being transferred to a human\n\n2. Notify Human Agent: Sends alert to support team via WhatsApp with customer details and query",
+        "height": 180,
+        "width": 300
+      },
+      "id": "7a465b88-60fb-45b4-a9f9-9ca5c0666c4f",
+      "name": "Note: Escalation Path",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        1632
+      ]
+    },
+    {
+      "parameters": {
+        "content": "RAG TOOL (Knowledge Base)\n\nRetrieves relevant business information from your Supabase vector database. Used for policies, FAQs, operating hours, and other business details. Uses OpenAI embeddings for semantic search.",
+        "height": 180,
+        "width": 300
+      },
+      "id": "e93def53-c21b-4723-83d6-c532774c3e39",
+      "name": "Note: RAG Tool",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        1936
+      ]
+    }
+  ],
+  "pinData": {
+    "WhatsApp Trigger1": [
+      {
+        "json": {
+          "messaging_product": "whatsapp",
+          "metadata": {
+            "display_phone_number": "15551884170",
+            "phone_number_id": "933698959834668"
+          },
+          "contacts": [
+            {
+              "profile": {
+                "name": "Summer Sportswear3"
+              },
+              "wa_id": "254799060802"
+            }
+          ],
+          "messages": [
+            {
+              "from": "254799060802",
+              "id": "wamid.HBgMMjU0Nzk5MDYwODAyFQIAEhggQTVBQ0ZGOTczMjQ1QzgwNjEzODIwRTVDNkM0ODZCM0MA",
+              "timestamp": "1769840422",
+              "text": {
+                "body": "Do you have any customers support"
+              },
+              "type": "text"
+            }
+          ],
+          "field": "messages"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Should Escalate?": {
+      "main": [
+        [
+          {
+            "node": "Send Escalation Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger1": {
+      "main": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Confidence": {
+      "main": [
+        [
+          {
+            "node": "Should Escalate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Escalation Message": {
+      "main": [
+        [
+          {
+            "node": "Notify Human Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI2": {
+      "ai_embedding": [
+        [
+          {
+            "node": "RAG tool",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search goods": {
+      "ai_tool": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update orders": {
+      "ai_tool": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "record order": {
+      "ai_tool": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delete order": {
+      "ai_tool": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "supabase bot1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "supabase bot1": {
+      "main": [
+        [
+          {
+            "node": "Analyze Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "61cc5476-f996-4b72-b416-1972ce186f09",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b6b0ee808a73ec5c587968060060fc7cb1bc97ad4cb1300fa8dcd301439eaf15"
+  },
+  "id": "mk9sri8WfoS7s6vAfyKaH",
+  "tags": []
+}
